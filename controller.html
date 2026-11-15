@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Drone Remote Touch Controller</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  
+  <!-- NippleJS (Vendor local with CDN fallback) -->
+  <script src="/static/vendor/nipplejs.min.js"></script>
+  <script>
+    if (typeof nipplejs === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- PeerJS WebRTC (Vendor local with CDN fallback for serverless/static web hosting) -->
+  <script src="/static/vendor/peerjs.min.js"></script>
+  <script>
+    if (typeof Peer === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary: #00f0ff;
+      --primary-glow: rgba(0, 240, 255, 0.4);
+      --accent: #ffd700;
+      --accent-glow: rgba(255, 215, 0, 0.4);
+      --success: #00ff88;
+      --success-glow: rgba(0, 255, 136, 0.5);
+      --danger: #ff3366;
+      --bg-dark: #090e17;
+      --panel-bg: rgba(16, 24, 38, 0.9);
+      --border-color: rgba(0, 240, 255, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: 'Rajdhani', sans-serif;
+      color: #ffffff;
+      position: fixed;
+    }
+
+    /* Subtle Carbon Fiber / Grid Pattern Background */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.04) 0%, transparent 70%),
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 24px 24px, 24px 24px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    #app-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Top Command Header */
+    #top-bar {
+      height: 64px;
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      z-index: 20;
+    }
+
+    .room-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ffaa00;
+      box-shadow: 0 0 8px #ffaa00;
+      animation: pulse-dot 1.5s infinite;
+    }
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success-glow);
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+    .room-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--accent);
+      text-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* AI Auto-Pilot Center Toggle Button */
+    #autopilot-toggle {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      padding: 9px 24px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #99aabb;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+      outline: none;
+    }
+    #autopilot-toggle.active {
+      background: rgba(0, 255, 136, 0.22);
+      color: var(--success);
+      border-color: var(--success);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.45);
+      animation: pulse-ap 2s infinite;
+    }
+    @keyframes pulse-ap {
+      0%, 100% { box-shadow: 0 0 16px rgba(0, 255, 136, 0.4); }
+      50% { box-shadow: 0 0 26px rgba(0, 255, 136, 0.7); }
+    }
+
+    .top-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .action-btn {
+      background: rgba(255, 51, 102, 0.15);
+      border: 1px solid rgba(255, 51, 102, 0.4);
+      color: #ff6688;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .action-btn:active {
+      background: rgba(255, 51, 102, 0.35);
+      transform: scale(0.96);
+    }
+
+    /* Joystick Control Area */
+    #control-deck {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      height: calc(100% - 64px);
+      position: relative;
+    }
+
+    .stick-zone {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stick-zone.left {
+      border-right: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+
+    /* Holographic Crosshair Reticle around Joysticks */
+    .stick-reticle {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .stick-reticle.left {
+      border-color: rgba(0, 240, 255, 0.18);
+    }
+    .stick-reticle.right {
+      border-color: rgba(255, 215, 0, 0.18);
+    }
+
+    .stick-label {
+      position: absolute;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+    .stick-label.top { top: 18px; }
+    .stick-label.bottom { bottom: 18px; }
+    .stick-label.left-side { left: 20px; }
+    .stick-label.right-side { right: 20px; }
+
+    .label-left { color: var(--primary); text-shadow: 0 0 8px var(--primary-glow); }
+    .label-right { color: var(--accent); text-shadow: 0 0 8px var(--accent-glow); }
+
+    /* Telemetry readout snippet at center bottom */
+    #center-telemetry {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 16px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 4px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: #8899aa;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #center-telemetry span strong {
+      color: #ffffff;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    /* Landscape Mode Suggestion Overlay */
+    #orientation-warning {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(8, 12, 20, 0.96);
+      backdrop-filter: blur(10px);
+      z-index: 9999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      text-align: center;
+    }
+    .rotate-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      animation: rotate-anim 2s infinite ease-in-out;
+    }
+    @keyframes rotate-anim {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(90deg); }
+    }
+    .rotate-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    .rotate-desc {
+      font-size: 14px;
+      color: #a0b2c6;
+      max-width: 320px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Landscape Lock Warning Overlay -->
+  <div id="orientation-warning">
+    <div class="rotate-icon">📱 ↷</div>
+    <div class="rotate-title">ROTATE PHONE TO LANDSCAPE</div>
+    <div class="rotate-desc">
+      For dual-thumb flight controls (Throttle, Yaw, Pitch, Roll), please hold your phone horizontally in landscape mode.
+    </div>
+  </div>
+
+  <div id="app-container">
+    <!-- Top Bar -->
+    <header id="top-bar">
+      <div class="room-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="room-badge" id="room-code-display">ROOM: ----</div>
+      </div>
+
+      <!-- AI Auto-Pilot Toggle Button -->
+      <button id="autopilot-toggle" title="Toggle autonomous checkpoint navigation">
+        <span id="ap-icon">🤖</span>
+        <span id="ap-text">AI AUTO-PILOT: OFF</span>
+      </button>
+
+      <!-- Top Right Actions -->
+      <div class="top-right-actions">
+        <button class="action-btn" id="btn-reset">RESET</button>
+      </div>
+    </header>
+
+    <!-- Main Dual Joystick Deck -->
+    <main id="control-deck">
+      <!-- Left Joystick: Throttle (Y) & Yaw (X) -->
+      <div class="stick-zone left" id="zone-left">
+        <div class="stick-reticle left"></div>
+        <div class="stick-label top label-left">▲ THROTTLE UP</div>
+        <div class="stick-label bottom label-left">▼ THROTTLE DOWN</div>
+        <div class="stick-label left-side label-left">◄ YAW L</div>
+        <div class="stick-label right-side label-left">YAW R ►</div>
+      </div>
+
+      <!-- Right Joystick: Pitch (Y) & Roll (X) -->
+      <div class="stick-zone right" id="zone-right">
+        <div class="stick-reticle right"></div>
+        <div class="stick-label top label-right">▲ PITCH FWD</div>
+        <div class="stick-label bottom label-right">▼ PITCH BACK</div>
+        <div class="stick-label left-side label-right">◄ ROLL L</div>
+        <div class="stick-label right-side label-right">ROLL R ►</div>
+      </div>
+
+      <!-- Live Center Telemetry Readout -->
+      <div id="center-telemetry">
+        <span>THR: <strong id="val-thr-t">0%</strong></span>
+        <span>YAW: <strong id="val-yaw-t">0.0</strong></span>
+        <span>PIT: <strong id="val-pit-t">0.0</strong></span>
+        <span>ROL: <strong id="val-rol-t">0.0</strong></span>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // 1. Room ID Extraction & WebSocket Connection
+    // -------------------------------------------------------------
+    // Extract room_id from path: /controller/{room_id} or query: ?room={room_id}
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    let roomId = '';
+    if (pathParts.length >= 2 && pathParts[0] === 'controller') {
+      roomId = pathParts[1].toUpperCase();
+    } else {
+      const urlParams = new URLSearchParams(window.location.search);
+      roomId = (urlParams.get('room') || 'ABCD').toUpperCase();
+    }
+
+    document.getElementById('room-code-display').innerText = `ROOM: ${roomId}`;
+
+    let ws = null;
+    let peer = null;
+    let peerConn = null;
+    let isConnected = false;
+    let connectionMode = 'ws'; // 'ws' or 'p2p'
+    const statusDot = document.getElementById('status-dot');
+
+    function initPeerJSController() {
+      if (peerConn && peerConn.open) return;
+      if (typeof Peer === 'undefined') return;
+      console.log("[P2P Mode] Initializing PeerJS WebRTC client...");
+      try {
+        if (!peer) {
+          peer = new Peer({ debug: 1 });
+        }
+
+        peer.on('open', (myId) => {
+          const targetHostId = `drone-room-${roomId.toLowerCase()}`;
+          console.log(`[P2P Mode] Connecting to host: ${targetHostId}...`);
+          const conn = peer.connect(targetHostId, { reliable: false });
+
+          conn.on('open', () => {
+            console.log("[P2P Mode] Connected to host simulator via WebRTC DataChannel!");
+            peerConn = conn;
+            isConnected = true;
+            connectionMode = 'p2p';
+            statusDot.classList.add('connected');
+            sendControlState();
+          });
+
+          conn.on('close', () => {
+            console.log("[P2P Mode] Connection closed.");
+            peerConn = null;
+            if (connectionMode === 'p2p') {
+              isConnected = false;
+              statusDot.classList.remove('connected');
+            }
+          });
+        });
+
+        peer.on('error', (err) => {
+          console.warn("[P2P Mode] PeerJS error:", err.type);
+        });
+      } catch (e) {
+        console.warn("PeerJS client init error:", e);
+      }
+    }
+
+    function connectControllerWebSocket() {
+      // If running on static hosting or file://, activate P2P directly
+      if (window.location.protocol === 'file:' || window.location.hostname.includes('github.io')) {
+        initPeerJSController();
+        return;
+      }
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}/controller`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (e) {
+        initPeerJSController();
+        return;
+      }
+
+      const fallbackTimer = setTimeout(() => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          console.log("WebSocket slow/unavailable, trying WebRTC P2P fallback...");
+          initPeerJSController();
+        }
+      }, 3500);
+
+      ws.onopen = () => {
+        clearTimeout(fallbackTimer);
+        console.log(`Connected to room ${roomId} via WebSocket.`);
+        isConnected = true;
+        connectionMode = 'ws';
+        statusDot.classList.add('connected');
+        sendControlState();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'simulator_status') {
+            console.log("Simulator status:", msg);
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => {
+        if (connectionMode === 'ws') {
+          isConnected = false;
+          statusDot.classList.remove('connected');
+          initPeerJSController();
+        }
+        setTimeout(connectControllerWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => {
+        initPeerJSController();
+      };
+    }
+
+    connectControllerWebSocket();
+
+    // -------------------------------------------------------------
+    // 2. Control State & Haptics
+    // -------------------------------------------------------------
+    const controlState = {
+      type: 'control',
+      throttle: 0.0, // -1.0 to 1.0 (climb / descend)
+      yaw: 0.0,      // -1.0 to 1.0 (turn left / right)
+      pitch: 0.0,    // -1.0 to 1.0 (forward / backward)
+      roll: 0.0,     // -1.0 to 1.0 (bank left / right)
+      autopilot: false
+    };
+
+    function triggerHaptic(ms = 25) {
+      if (window.navigator && window.navigator.vibrate) {
+        try { window.navigator.vibrate(ms); } catch (e) {}
+      }
+    }
+
+    let isDirty = false;
+    function sendControlState() {
+      // Send via WebSocket if open
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(controlState));
+        isDirty = false;
+      }
+      // Send via WebRTC DataChannel if open
+      if (peerConn && peerConn.open) {
+        peerConn.send(controlState);
+        isDirty = false;
+      }
+    }
+
+    // High frequency update loop (30 Hz)
+    setInterval(() => {
+      if (isDirty) {
+        sendControlState();
+      }
+      // Update small telemetry indicator
+      document.getElementById('val-thr-t').innerText = `${Math.round((controlState.throttle * 50) + 50)}%`;
+      document.getElementById('val-yaw-t').innerText = controlState.yaw.toFixed(2);
+      document.getElementById('val-pit-t').innerText = controlState.pitch.toFixed(2);
+      document.getElementById('val-rol-t').innerText = controlState.roll.toFixed(2);
+    }, 33);
+
+    // -------------------------------------------------------------
+    // 3. AI Auto-Pilot Toggle Button
+    // -------------------------------------------------------------
+    const apBtn = document.getElementById('autopilot-toggle');
+    const apText = document.getElementById('ap-text');
+
+    apBtn.addEventListener('click', () => {
+      triggerHaptic(40);
+      controlState.autopilot = !controlState.autopilot;
+      updateAutopilotUI();
+      sendControlState();
+    });
+
+    function updateAutopilotUI() {
+      if (controlState.autopilot) {
+        apBtn.classList.add('active');
+        apText.innerText = "AI AUTO-PILOT: ON";
+      } else {
+        apBtn.classList.remove('active');
+        apText.innerText = "AI AUTO-PILOT: OFF";
+      }
+    }
+
+    // Reset button
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      triggerHaptic(50);
+      controlState.throttle = 0;
+      controlState.yaw = 0;
+      controlState.pitch = 0;
+      controlState.roll = 0;
+      controlState.autopilot = false;
+      updateAutopilotUI();
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'control', reset: true, ...controlState }));
+      }
+    });
+
+    // -------------------------------------------------------------
+    // 4. Dual Static Touch Joysticks with NippleJS
+    // -------------------------------------------------------------
+    const leftZone = document.getElementById('zone-left');
+    const rightZone = document.getElementById('zone-right');
+
+    const stickSize = Math.min(150, Math.max(110, window.innerHeight * 0.42));
+
+    // Left Stick: Throttle (Y) and Yaw (X)
+    const leftJoystick = nipplejs.create({
+      zone: leftZone,
+      mode: 'static',
+      position: { left: '50%', top: '50%' },
+      color: '#00f0ff',
+      size: stickSize,
+      fadeTime: 100
+    });
+
+    leftJoystick.on('move', (evt, data) => {
+      const maxDist = stickSize / 2;
+      const distRatio = Math.min(1.0, data.distance / maxDist);
+      const angle = data.angle.radian;
+
+      // X: Yaw (left is negative, right is positive)
+      const rawX = Math.cos(angle) * distRatio;
+      // Y: Throttle (up is positive climb, down is negative descent)
+      const rawY = Math.sin(angle) * distRatio;
+
+      // Deadzone 0.04
+      controlState.yaw = Math.abs(rawX) < 0.04 ? 0 : rawX;
+      controlState.throttle = Math.abs(rawY) < 0.04 ? 0 : rawY;
+      isDirty = true;
+    });
+
+    leftJoystick.on('end', () => {
+      controlState.yaw = 0.0;
+      controlState.throttle = 0.0;
+      isDirty = true;
+      sendControlState();
+    });
+
+    // Right Stick: Pitch (Y) and Roll (X)
+    const rightJoystick = nipplejs.create({
+      zone: rightZone,
+      mode: 'static',
+      position: { left: '50%', top: '50%' },
+      color: '#ffd700',
+      size: stickSize,
+      fadeTime: 100
+    });
+
+    rightJoystick.on('move', (evt, data) => {
+      const maxDist = stickSize / 2;
+      const distRatio = Math.min(1.0, data.distance / maxDist);
+      const angle = data.angle.radian;
+
+      // X: Roll (bank left is negative, bank right is positive)
+      const rawX = Math.cos(angle) * distRatio;
+      // Y: Pitch (push forward/up is positive forward flight, pull down is negative backward flight)
+      const rawY = Math.sin(angle) * distRatio;
+
+      controlState.roll = Math.abs(rawX) < 0.04 ? 0 : rawX;
+      controlState.pitch = Math.abs(rawY) < 0.04 ? 0 : rawY;
+      isDirty = true;
+    });
+
+    rightJoystick.on('end', () => {
+      controlState.roll = 0.0;
+      controlState.pitch = 0.0;
+      isDirty = true;
+      sendControlState();
+    });
+
+    // -------------------------------------------------------------
+    // 5. Orientation Warning & Fullscreen
+    // -------------------------------------------------------------
+    const orientWarning = document.getElementById('orientation-warning');
+    function checkOrientation() {
+      if (window.innerHeight > window.innerWidth) {
+        orientWarning.style.display = 'flex';
+      } else {
+        orientWarning.style.display = 'none';
+      }
+    }
+    window.addEventListener('resize', checkOrientation);
+    checkOrientation();
+
+    // Prevent default touch gestures (pinch-zoom, scroll)
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('touchmove', (e) => {
+      if (e.scale !== 1) e.preventDefault();
+    }, { passive: false });
+  </script>
+</body>
+</html>

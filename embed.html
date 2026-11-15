@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embed 3D Drone Simulator on Your Website</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0b0f19;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+      padding: 30px 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 26px;
+      color: #00f0ff;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 15px;
+    }
+    .embed-card {
+      background: #131b2e;
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      margin-bottom: 30px;
+    }
+    .card-header {
+      padding: 12px 18px;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      color: #ffd700;
+    }
+    .iframe-wrapper {
+      position: relative;
+      width: 100%;
+      height: 560px;
+      background: #000;
+    }
+    .iframe-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .code-section {
+      background: #131b2e;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    h2 {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 20px;
+      color: #00f0ff;
+      margin-bottom: 12px;
+    }
+    pre {
+      background: #070a12;
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      padding: 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #38bdf8;
+      position: relative;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 240, 255, 0.2);
+      border: 1px solid #00f0ff;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .copy-btn:hover {
+      background: rgba(0, 240, 255, 0.4);
+    }
+    .platforms {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .platform-box {
+      background: #0d1424;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .platform-title {
+      font-weight: 700;
+      color: #ffd700;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .platform-desc {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>EMBED 3D DRONE SIMULATOR</h1>
+      <p class="subtitle">Live interactive preview of how the simulator embeds seamlessly into any website or blog</p>
+    </header>
+
+    <div class="embed-card">
+      <div class="card-header">
+        <span>🎮 LIVE EMBEDDED PREVIEW</span>
+        <span>QR CODE & CONTROLLER FULLY FUNCTIONAL</span>
+      </div>
+      <div class="iframe-wrapper">
+        <iframe src="simulator.html" allow="accelerometer; gyroscope; fullscreen" allowfullscreen></iframe>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <h2>📋 Copy & Paste Code for Any Website</h2>
+      <p style="font-size: 14px; color: #94a3b8; margin-bottom: 12px;">
+        Add this single line of HTML to your WordPress site, Wix, Webflow, React portfolio, or any web page:
+      </p>
+      <pre><code>&lt;!-- 3D AI Drone Simulator Embed --&gt;
+&lt;iframe 
+  src="https://YOUR-PUBLIC-URL-OR-DOMAIN/simulator.html" 
+  width="100%" 
+  height="600px" 
+  frameborder="0" 
+  allow="accelerometer; gyroscope; fullscreen" 
+  allowfullscreen&gt;
+&lt;/iframe&gt;</code><button class="copy-btn" onclick="navigator.clipboard.writeText(this.previousSibling.innerText); alert('Copied embed code!');">COPY</button></pre>
+
+      <div class="platforms">
+        <div class="platform-box">
+          <div class="platform-title">WordPress / Elementor</div>
+          <div class="platform-desc">Add a "Custom HTML" block on any page and paste the iframe snippet above.</div>
+        </div>
+        <div class="platform-box">
+          <div class="platform-title">Wix / Squarespace / Webflow</div>
+          <div class="platform-desc">Use the "Embed HTML / Embed Code" element and paste the iframe snippet.</div>
+        </div>
+        <div class="platform-box">
+          <div class="platform-title">React / Next.js / Vue</div>
+          <div class="platform-desc">Render as an &lt;iframe&gt; component or drop <code>simulator.html</code> into your <code>public/</code> folder.</div>
+        </div>
+        <div class="platform-box">
+          <div class="platform-title">GitHub Pages / Netlify</div>
+          <div class="platform-desc">Upload this repository to GitHub, enable GitHub Pages, and it runs 100% serverless via WebRTC P2P!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

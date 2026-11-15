@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D AI Drone Simulator | Dual-Screen Flight Experience</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Three.js (Vendor local with CDN fallback) -->
+  <script src="/static/vendor/three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+  
+  <!-- QRCode.js (Vendor local with CDN fallback) -->
+  <script src="/static/vendor/qrcode.min.js"></script>
+  <script>
+    if (typeof QRCode === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- PeerJS WebRTC (Vendor local with CDN fallback for serverless/static web hosting) -->
+  <script src="/static/vendor/peerjs.min.js"></script>
+  <script>
+    if (typeof Peer === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary: #00f0ff;
+      --primary-glow: rgba(0, 240, 255, 0.4);
+      --accent: #ffd700;
+      --accent-glow: rgba(255, 215, 0, 0.5);
+      --success: #00ff88;
+      --danger: #ff3366;
+      --warning: #ffaa00;
+      --bg-dark: rgba(10, 15, 25, 0.85);
+      --glass-border: rgba(0, 240, 255, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #87ceeb;
+      font-family: 'Rajdhani', sans-serif;
+      color: #ffffff;
+    }
+
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Crosshair & Flight Reticle */
+    #flight-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0.75;
+      transition: opacity 0.3s;
+    }
+    .crosshair-circle {
+      width: 32px;
+      height: 32px;
+      border: 1.5px solid var(--primary);
+      border-radius: 50%;
+      position: relative;
+      box-shadow: 0 0 8px var(--primary-glow);
+    }
+    .crosshair-dot {
+      width: 4px;
+      height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Top Left HUD */
+    #hud-left {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .glass-panel {
+      background: var(--bg-dark);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0 16px rgba(0, 240, 255, 0.05);
+      pointer-events: auto;
+    }
+
+    .hud-title-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    .brand-logo {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--primary);
+      text-shadow: 0 0 10px var(--primary-glow);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--primary);
+      animation: pulse-glow 2s infinite;
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .telemetry-cell {
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 6px;
+      padding: 6px 8px;
+      border-left: 2px solid var(--primary);
+    }
+
+    .cell-label {
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: #8899aa;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .cell-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-top: 2px;
+    }
+    .cell-value span {
+      font-size: 10px;
+      color: #778899;
+      font-weight: 500;
+    }
+
+    /* Course Progress & Score Bar */
+    .course-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 215, 0, 0.08);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+    }
+    .ring-progress-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ring-count {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: #ffffff;
+      text-shadow: 0 0 10px var(--accent-glow);
+    }
+    .score-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--success);
+      text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+    }
+
+    /* AI Flight Coach Box */
+    .ai-coach-card {
+      background: rgba(12, 22, 38, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 10px;
+      padding: 12px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ai-coach-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, var(--primary), var(--accent));
+    }
+    .coach-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .ai-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00f0ff, #7000ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      box-shadow: 0 0 8px var(--primary-glow);
+    }
+    .coach-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--primary);
+    }
+    .ai-status-pill {
+      margin-left: auto;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      font-weight: 700;
+    }
+    .coach-msg-text {
+      font-size: 13px;
+      line-height: 1.4;
+      color: #d8e5f0;
+      font-weight: 500;
+      min-height: 36px;
+      transition: all 0.3s ease;
+    }
+
+    /* Top Right QR Code & Room Card */
+    #hud-right {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .room-card {
+      text-align: center;
+    }
+
+    .room-header {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #99aabb;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .room-id-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--accent);
+      text-shadow: 0 0 12px var(--accent-glow);
+      margin-bottom: 10px;
+      display: inline-block;
+      padding: 2px 14px;
+      background: rgba(255, 215, 0, 0.1);
+      border-radius: 6px;
+      border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    #qrcode-container {
+      width: 150px;
+      height: 150px;
+      margin: 0 auto 10px auto;
+      padding: 8px;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #qrcode-container img, #qrcode-container canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .controller-status-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow: 0 0 8px var(--warning);
+      animation: pulse-glow 1.5s infinite;
+    }
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+    .status-text {
+      color: #d0d8e2;
+    }
+
+    .direct-link-btn {
+      display: block;
+      margin-top: 8px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .direct-link-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    /* Autopilot Center Banner */
+    #autopilot-banner {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      border-radius: 20px;
+      background: rgba(0, 255, 136, 0.2);
+      border: 1px solid var(--success);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+      backdrop-filter: blur(8px);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--success);
+      animation: pulse-glow 2s infinite;
+    }
+
+    /* Bottom Control Bar / Fallback Keyboard Guide */
+    #hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      pointer-events: none;
+    }
+    .bottom-hint {
+      background: var(--bg-dark);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 6px 18px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #99aabb;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .kbd-tag {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    /* Sound and View switchers */
+    .icon-btn {
+      background: var(--bg-dark);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: #ffffff;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      transition: all 0.2s;
+    }
+    .icon-btn:hover {
+      background: rgba(0, 240, 255, 0.2);
+      border-color: var(--primary);
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.04); }
+    }
+
+    /* Impact Screen Shake */
+    .shake-impact {
+      animation: impact-shake 0.4s ease-out;
+    }
+    @keyframes impact-shake {
+      0% { transform: translate(0, 0); }
+      20% { transform: translate(-6px, 8px); }
+      40% { transform: translate(6px, -6px); }
+      60% { transform: translate(-3px, 4px); }
+      80% { transform: translate(3px, -2px); }
+      100% { transform: translate(0, 0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL Canvas Container -->
+  <div id="webgl-container"></div>
+
+  <!-- Flight Reticle Crosshair -->
+  <div id="flight-crosshair">
+    <div class="crosshair-circle">
+      <div class="crosshair-dot"></div>
+    </div>
+  </div>
+
+  <!-- AI Autopilot Banner -->
+  <div id="autopilot-banner">
+    <span>🤖</span>
+    <span>AI AUTO-PILOT ENGAGED &mdash; NAVIGATING TO CHECKPOINT</span>
+  </div>
+
+  <!-- Top Left HUD: Flight Telemetry & AI Coach -->
+  <div id="hud-left">
+    <div class="glass-panel">
+      <div class="hud-title-bar">
+        <div class="brand-logo">
+          <div class="brand-dot"></div>
+          AI DRONE SIMULATOR
+        </div>
+        <div style="font-size: 11px; color: #8899aa; font-weight: 600;">v1.0</div>
+      </div>
+
+      <!-- Telemetry Data Grid -->
+      <div class="telemetry-grid">
+        <div class="telemetry-cell">
+          <div class="cell-label">Altitude</div>
+          <div class="cell-value" id="val-alt">0.8 <span>m</span></div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="cell-label">Airspeed</div>
+          <div class="cell-value" id="val-spd">0 <span>km/h</span></div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="cell-label">Heading</div>
+          <div class="cell-value" id="val-hdg">000 <span>°</span></div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="cell-label">Throttle</div>
+          <div class="cell-value" id="val-thr">0 <span>%</span></div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="cell-label">Pitch</div>
+          <div class="cell-value" id="val-pitch">0 <span>°</span></div>
+        </div>
+        <div class="telemetry-cell">
+          <div class="cell-label">Roll</div>
+          <div class="cell-value" id="val-roll">0 <span>°</span></div>
+        </div>
+      </div>
+
+      <!-- Course & Score Progress -->
+      <div class="course-bar">
+        <div class="ring-progress-label">
+          <span>🎯 RINGS:</span>
+          <span class="ring-count" id="val-rings">0 / 6</span>
+        </div>
+        <div class="score-badge" id="val-score">0 PTS</div>
+      </div>
+
+      <!-- Dynamic AI Flight Coach -->
+      <div class="ai-coach-card">
+        <div class="coach-header">
+          <div class="ai-avatar">AI</div>
+          <div class="coach-title">FLIGHT COACH</div>
+          <div class="ai-status-pill" id="coach-status-pill">MONITORING</div>
+        </div>
+        <div class="coach-msg-text" id="coach-message">
+          Initializing flight systems. Ready for takeoff on runway helipad. Throttle up to begin course!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Right HUD: Mobile Remote QR Code & Connection Status -->
+  <div id="hud-right">
+    <div class="glass-panel room-card">
+      <div class="room-header">Mobile Remote Controller</div>
+      <div class="room-id-badge" id="room-badge">ABCD</div>
+
+      <div id="qrcode-container" title="Scan with mobile camera to fly drone"></div>
+
+      <div class="controller-status-box">
+        <div class="status-dot" id="status-dot"></div>
+        <span class="status-text" id="status-text">Awaiting Controller...</span>
+      </div>
+
+      <a id="direct-controller-link" class="direct-link-btn" target="_blank" href="#">
+        📱 Open Controller in New Tab
+      </a>
+      
+      <div style="margin-top: 6px; display: flex; gap: 6px; justify-content: center;">
+        <button class="icon-btn" id="btn-toggle-camera">📷 View: Follow</button>
+        <button class="icon-btn" id="btn-audio-toggle">🔊 Sound: ON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar: Keyboard Fallback & Quick Actions -->
+  <div id="hud-bottom">
+    <div class="bottom-hint">
+      <span>📱 Touch Phone OR Keys:</span>
+      <span><span class="kbd-tag">W</span><span class="kbd-tag">S</span> Thrust</span>
+      <span><span class="kbd-tag">A</span><span class="kbd-tag">D</span> Yaw</span>
+      <span><span class="kbd-tag">↑</span><span class="kbd-tag">↓</span> Pitch</span>
+      <span><span class="kbd-tag">←</span><span class="kbd-tag">→</span> Roll</span>
+      <span><span class="kbd-tag">SPACE</span> AI Pilot</span>
+      <span><span class="kbd-tag">R</span> Reset</span>
+    </div>
+  </div>
+
+  <!-- Sound FX Synthesizer (Web Audio API) -->
+  <script>
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+      }
+      playChime() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc1.type = 'sine';
+          osc2.type = 'triangle';
+          osc1.frequency.setValueAtTime(587.33, now); // D5
+          osc1.frequency.exponentialRampToValueAtTime(880.00, now + 0.15); // A5
+          osc2.frequency.setValueAtTime(880.00, now);
+          osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.2); // D6
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 0.5);
+          osc2.stop(now + 0.5);
+        } catch(e){}
+      }
+      playImpact() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        } catch(e){}
+      }
+      playAlert() {
+        if (!this.enabled || !this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(660, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        } catch(e){}
+      }
+    }
+    const sounds = new SoundEngine();
+    window.addEventListener('click', () => sounds.init(), { once: true });
+    window.addEventListener('keydown', () => sounds.init(), { once: true });
+  </script>
+
+  <!-- Main Simulator Engine -->
+  <script>
+    // -------------------------------------------------------------
+    // 1. Room ID, WebSocket & QR Code Setup
+    // -------------------------------------------------------------
+    const urlParams = new URLSearchParams(window.location.search);
+    let roomId = urlParams.get('room');
+    if (!roomId) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      roomId = '';
+      for (let i = 0; i < 4; i++) {
+        roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const newUrl = window.location.pathname + '?room=' + roomId;
+      window.history.replaceState({ path: newUrl }, '', newUrl);
+    } else {
+      roomId = roomId.toUpperCase();
+    }
+
+    document.getElementById('room-badge').innerText = roomId;
+    let controllerUrl = `${window.location.origin}/controller/${roomId}`;
+    const directLink = document.getElementById('direct-controller-link');
+    directLink.href = controllerUrl;
+
+    let qrCodeInstance = null;
+    function renderQRCode(url) {
+      const container = document.getElementById('qrcode-container');
+      container.innerHTML = '';
+      try {
+        qrCodeInstance = new QRCode(container, {
+          text: url,
+          width: 134,
+          height: 134,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (e) {
+        console.warn("QR code render fallback:", e);
+      }
+    }
+    renderQRCode(controllerUrl);
+
+    // If on localhost / 127.0.0.1, resolve LAN IP so mobile phone scanning works over Wi-Fi
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      fetch('/api/network-ip')
+        .then(res => res.json())
+        .then(data => {
+          if (data.lan_ip && data.lan_ip !== '127.0.0.1') {
+            const portStr = window.location.port ? `:${window.location.port}` : '';
+            controllerUrl = `http://${data.lan_ip}${portStr}/controller/${roomId}`;
+            directLink.href = controllerUrl;
+            renderQRCode(controllerUrl);
+            console.log("Updated Mobile QR code for LAN Wi-Fi:", controllerUrl);
+          }
+        })
+        .catch(e => console.log("Using origin URL for QR code"));
+    }
+
+    // WebSocket & WebRTC PeerJS Dual Connection
+    let ws = null;
+    let peer = null;
+    let peerConn = null;
+    let isControllerConnected = false;
+    let activeMode = 'ws'; // 'ws' or 'p2p'
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    function initPeerJSFallback() {
+      if (peer || typeof Peer === 'undefined') return;
+      try {
+        const peerId = `drone-room-${roomId.toLowerCase()}`;
+        peer = new Peer(peerId, { debug: 1 });
+
+        peer.on('open', (id) => {
+          console.log(`[P2P Mode] WebRTC PeerJS host ready with ID: ${id}`);
+        });
+
+        peer.on('connection', (conn) => {
+          console.log("[P2P Mode] Mobile Controller connected via WebRTC DataChannel!");
+          peerConn = conn;
+          activeMode = 'p2p';
+          isControllerConnected = true;
+          updateControllerHUD(true);
+
+          conn.on('data', (data) => {
+            applyRemoteControl(data);
+          });
+
+          conn.on('close', () => {
+            console.log("[P2P Mode] Controller disconnected");
+            peerConn = null;
+            isControllerConnected = false;
+            updateControllerHUD(false);
+          });
+        });
+
+        peer.on('error', (err) => {
+          console.warn("[P2P Mode] PeerJS error:", err.type);
+        });
+      } catch (e) {
+        console.warn("PeerJS init error:", e);
+      }
+    }
+
+    function connectWebSocket() {
+      // If running on static hosting or file:// protocol, activate P2P directly
+      if (window.location.protocol === 'file:' || window.location.hostname.includes('github.io')) {
+        initPeerJSFallback();
+        return;
+      }
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}/simulator`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (e) {
+        initPeerJSFallback();
+        return;
+      }
+
+      const wsFallbackTimer = setTimeout(() => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          console.log("WebSocket timeout, activating WebRTC PeerJS fallback...");
+          initPeerJSFallback();
+        }
+      }, 3500);
+
+      ws.onopen = () => {
+        clearTimeout(wsFallbackTimer);
+        activeMode = 'ws';
+        console.log(`Simulator WebSocket connected to room: ${roomId}`);
+        if (window.simPingInterval) clearInterval(window.simPingInterval);
+        window.simPingInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 15000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'controller_status') {
+            isControllerConnected = data.connected;
+            updateControllerHUD(isControllerConnected);
+          } else if (data.throttle !== undefined || data.type === 'control') {
+            applyRemoteControl(data);
+          }
+        } catch (e) {
+          console.error("Error processing ws message:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        if (activeMode !== 'p2p') {
+          initPeerJSFallback();
+        }
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => {
+        initPeerJSFallback();
+      };
+    }
+
+    function updateControllerHUD(connected) {
+      if (connected) {
+        statusDot.classList.add('connected');
+        statusText.innerText = "Mobile Connected!";
+        statusText.style.color = "#00ff88";
+        triggerCoachAdvice("Mobile Touch Controller linked! You now have remote flight command.", "success");
+        sounds.playChime();
+      } else {
+        statusDot.classList.remove('connected');
+        statusText.innerText = "Awaiting Controller...";
+        statusText.style.color = "#d0d8e2";
+      }
+    }
+
+    connectWebSocket();
+
+    // -------------------------------------------------------------
+    // 2. Control State & Keyboard Fallback
+    // -------------------------------------------------------------
+    const controls = {
+      throttle: 0.0, // -1.0 to +1.0
+      yaw: 0.0,      // -1.0 to +1.0
+      pitch: 0.0,    // -1.0 to +1.0
+      roll: 0.0,     // -1.0 to +1.0
+      autopilot: false
+    };
+
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.code === 'Space') {
+        toggleAutopilot();
+        e.preventDefault();
+      }
+      if (e.key.toLowerCase() === 'r') {
+        resetDrone();
+      }
+      if (e.key.toLowerCase() === 'c') {
+        cycleCameraMode();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    function applyRemoteControl(data) {
+      if (data.reset) {
+        resetDrone();
+      }
+      if (data.throttle !== undefined) controls.throttle = data.throttle;
+      if (data.yaw !== undefined) controls.yaw = data.yaw;
+      if (data.pitch !== undefined) controls.pitch = data.pitch;
+      if (data.roll !== undefined) controls.roll = data.roll;
+      if (data.autopilot !== undefined && data.autopilot !== controls.autopilot) {
+        setAutopilot(data.autopilot);
+      }
+    }
+
+    function toggleAutopilot() {
+      setAutopilot(!controls.autopilot);
+    }
+
+    function setAutopilot(active) {
+      controls.autopilot = active;
+      const banner = document.getElementById('autopilot-banner');
+      if (controls.autopilot) {
+        banner.style.display = 'flex';
+        triggerCoachAdvice("AI Auto-Pilot activated. Calculating optimal trajectory through checkpoint rings.", "ai");
+        sounds.playAlert();
+      } else {
+        banner.style.display = 'none';
+        triggerCoachAdvice("Manual flight control restored. Pilot has the controls.", "normal");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 3. Three.js Scene, Camera, Lighting & Fog
+    // -------------------------------------------------------------
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.FogExp2(0x87ceeb, 0.0032);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    container.appendChild(renderer.domElement);
+
+    // Lights
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x334422, 0.8);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.3);
+    sunLight.position.set(120, 200, 100);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 400;
+    const shadowD = 120;
+    sunLight.shadow.camera.left = -shadowD;
+    sunLight.shadow.camera.right = shadowD;
+    sunLight.shadow.camera.top = shadowD;
+    sunLight.shadow.camera.bottom = -shadowD;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    const ambientLight = new THREE.AmbientLight(0x223344, 0.5);
+    scene.add(ambientLight);
+
+    // -------------------------------------------------------------
+    // 4. Textured Ground & Runway Helipad
+    // -------------------------------------------------------------
+    // Procedural Runway & Ground Canvas
+    function createGroundTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      // Subtle grass green tone
+      ctx.fillStyle = '#4a7c59';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Noise speckles
+      ctx.fillStyle = 'rgba(30, 60, 40, 0.15)';
+      for (let i = 0; i < 4000; i++) {
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+      }
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i <= 512; i += 64) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0); ctx.lineTo(i, 512);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i); ctx.lineTo(512, i);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(40, 40);
+      return texture;
+    }
+
+    const groundGeo = new THREE.PlaneGeometry(800, 800);
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: createGroundTexture(),
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    // Helipad Landing Marker (Origin)
+    function createHelipad() {
+      const padGroup = new THREE.Group();
+
+      // Outer concrete base
+      const baseGeo = new THREE.CircleGeometry(7.5, 36);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x22262c, roughness: 0.8 });
+      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      baseMesh.rotation.x = -Math.PI / 2;
+      baseMesh.position.y = 0.02;
+      baseMesh.receiveShadow = true;
+      padGroup.add(baseMesh);
+
+      // Outer yellow ring
+      const ringGeo = new THREE.RingGeometry(6.6, 7.2, 36);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.DoubleSide });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = -Math.PI / 2;
+      ringMesh.position.y = 0.03;
+      padGroup.add(ringMesh);
+
+      // Helipad Letter "H"
+      const hCanvas = document.createElement('canvas');
+      hCanvas.width = 256;
+      hCanvas.height = 256;
+      const hCtx = hCanvas.getContext('2d');
+      hCtx.clearRect(0, 0, 256, 256);
+      hCtx.fillStyle = '#ffffff';
+      hCtx.font = 'bold 150px Arial';
+      hCtx.textAlign = 'center';
+      hCtx.textBaseline = 'middle';
+      hCtx.fillText('H', 128, 128);
+
+      const hTex = new THREE.CanvasTexture(hCanvas);
+      const hGeo = new THREE.PlaneGeometry(6, 6);
+      const hMat = new THREE.MeshBasicMaterial({ map: hTex, transparent: true, side: THREE.DoubleSide });
+      const hMesh = new THREE.Mesh(hGeo, hMat);
+      hMesh.rotation.x = -Math.PI / 2;
+      hMesh.position.y = 0.04;
+      padGroup.add(hMesh);
+
+      // 4 perimeter runway marker lights
+      const lightPositions = [
+        [-6.5, 6.5], [6.5, 6.5], [-6.5, -6.5], [6.5, -6.5]
+      ];
+      lightPositions.forEach(([x, z]) => {
+        const pGeo = new THREE.CylinderGeometry(0.2, 0.25, 0.4, 8);
+        const pMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const post = new THREE.Mesh(pGeo, pMat);
+        post.position.set(x, 0.2, z);
+        padGroup.add(post);
+
+        const bulbGeo = new THREE.SphereGeometry(0.18, 12, 12);
+        const bulbMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+        const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+        bulb.position.set(x, 0.45, z);
+        padGroup.add(bulb);
+      });
+
+      return padGroup;
+    }
+    scene.add(createHelipad());
+
+    // -------------------------------------------------------------
+    // 5. 3D Environment: Futuristic Buildings & Trees
+    // -------------------------------------------------------------
+    // Buildings with window textures
+    function createBuildingTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1e2430';
+      ctx.fillRect(0, 0, 128, 256);
+
+      ctx.fillStyle = '#ffd27d';
+      for (let y = 10; y < 240; y += 14) {
+        for (let x = 8; x < 120; x += 14) {
+          if (Math.random() > 0.35) {
+            ctx.fillStyle = Math.random() > 0.5 ? '#7ad7ff' : '#ffeaa7';
+            ctx.fillRect(x, y, 7, 8);
+          }
+        }
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    const bldgTexture = createBuildingTexture();
+    const bldgMaterial = new THREE.MeshStandardMaterial({
+      map: bldgTexture,
+      roughness: 0.4,
+      metalness: 0.6
+    });
+
+    const buildingDefs = [
+      { x: 70, z: -50, w: 22, h: 55, d: 24 },
+      { x: 95, z: -100, w: 25, h: 75, d: 28 },
+      { x: 110, z: -170, w: 30, h: 90, d: 32 },
+      { x: 60, z: -210, w: 26, h: 65, d: 25 },
+      { x: -10, z: -260, w: 32, h: 80, d: 30 },
+      { x: -80, z: -210, w: 28, h: 70, d: 26 },
+      { x: -105, z: -130, w: 24, h: 60, d: 24 },
+      { x: -85, z: -60, w: 22, h: 48, d: 20 },
+      { x: -60, z: 40, w: 25, h: 52, d: 25 },
+      { x: 60, z: 50, w: 24, h: 45, d: 22 },
+      { x: 140, z: -70, w: 30, h: 110, d: 30 },
+      { x: -140, z: -90, w: 35, h: 95, d: 35 },
+      { x: 30, z: -140, w: 18, h: 40, d: 18 },
+      { x: -35, z: -180, w: 20, h: 45, d: 20 }
+    ];
+
+    buildingDefs.forEach(b => {
+      const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
+      const mesh = new THREE.Mesh(geo, bldgMaterial);
+      mesh.position.set(b.x, b.h / 2, b.z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      // Rooftop beacon light
+      const beaconGeo = new THREE.SphereGeometry(0.6, 8, 8);
+      const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+      const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+      beacon.position.set(b.x, b.h + 0.6, b.z);
+      scene.add(beacon);
+    });
+
+    // Trees
+    function createTree(x, z, scale = 1) {
+      const tree = new THREE.Group();
+      // Trunk
+      const trunkGeo = new THREE.CylinderGeometry(0.3 * scale, 0.45 * scale, 2.5 * scale, 6);
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 1.25 * scale;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      // Foliage tiers
+      const foliageColors = [0x2e6f40, 0x3d8b4e, 0x489f5d];
+      for (let i = 0; i < 3; i++) {
+        const coneGeo = new THREE.ConeGeometry((2.2 - i * 0.45) * scale, (2.6 - i * 0.4) * scale, 7);
+        const coneMat = new THREE.MeshStandardMaterial({
+          color: foliageColors[i],
+          roughness: 0.8
+        });
+        const cone = new THREE.Mesh(coneGeo, coneMat);
+        cone.position.y = (2.6 + i * 1.5) * scale;
+        cone.castShadow = true;
+        tree.add(cone);
+      }
+      tree.position.set(x, 0, z);
+      return tree;
+    }
+
+    // Scatter 50 stylized trees naturally
+    const treeGroup = new THREE.Group();
+    for (let i = 0; i < 50; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 25 + Math.random() * 160;
+      const tx = Math.cos(angle) * radius;
+      const tz = Math.sin(angle) * radius;
+      // Don't put trees on the runway or buildings
+      if (Math.abs(tx) > 10 || Math.abs(tz) > 10) {
+        treeGroup.add(createTree(tx, tz, 0.8 + Math.random() * 0.6));
+      }
+    }
+    scene.add(treeGroup);
+
+    // -------------------------------------------------------------
+    // 6. Floating Golden Checkpoint Rings
+    // -------------------------------------------------------------
+    const ringWaypoints = [
+      { x: 0,   y: 9,  z: -45,  label: "Ring 1: Lift-off Gate" },
+      { x: 45,  y: 18, z: -85,  label: "Ring 2: East Ascend" },
+      { x: 75,  y: 28, z: -155, label: "Ring 3: High Apex" },
+      { x: 10,  y: 20, z: -210, label: "Ring 4: Skyline Slalom" },
+      { x: -55, y: 22, z: -140, label: "Ring 5: West Hairpin" },
+      { x: -25, y: 11, z: -55,  label: "Ring 6: Runway Return" }
+    ];
+
+    const rings = [];
+    let currentRingIndex = 0;
+    let score = 0;
+    let ringsClearedCount = 0;
+
+    const ringMatInactive = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      metalness: 0.85,
+      roughness: 0.25,
+      emissive: 0x443300
+    });
+
+    const ringMatActive = new THREE.MeshStandardMaterial({
+      color: 0xffe600,
+      metalness: 0.9,
+      roughness: 0.15,
+      emissive: 0x886600
+    });
+
+    const ringMatCleared = new THREE.MeshStandardMaterial({
+      color: 0x00ff88,
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: 0x006622
+    });
+
+    ringWaypoints.forEach((wp, index) => {
+      const ringGroup = new THREE.Group();
+      ringGroup.position.set(wp.x, wp.y, wp.z);
+
+      // Compute heading rotation to face the next ring
+      const nextWp = ringWaypoints[(index + 1) % ringWaypoints.length];
+      const angle = Math.atan2(nextWp.x - wp.x, nextWp.z - wp.z);
+      ringGroup.rotation.y = angle;
+
+      // 3D Golden Torus
+      const torusGeo = new THREE.TorusGeometry(3.6, 0.32, 20, 48);
+      const torusMesh = new THREE.Mesh(torusGeo, index === 0 ? ringMatActive : ringMatInactive);
+      torusMesh.castShadow = true;
+      ringGroup.add(torusMesh);
+
+      // Inner glowing field
+      const fieldGeo = new THREE.CircleGeometry(3.2, 24);
+      const fieldMat = new THREE.MeshBasicMaterial({
+        color: index === 0 ? 0xffd700 : 0x00f0ff,
+        transparent: true,
+        opacity: 0.18,
+        side: THREE.DoubleSide
+      });
+      const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
+      ringGroup.add(fieldMesh);
+
+      // Top Floating Chevron Indicator
+      const arrowGeo = new THREE.ConeGeometry(0.7, 1.4, 4);
+      const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+      const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+      arrow.rotation.x = Math.PI;
+      arrow.position.y = 4.8;
+      ringGroup.add(arrow);
+
+      scene.add(ringGroup);
+      rings.push({
+        group: ringGroup,
+        torus: torusMesh,
+        field: fieldMesh,
+        arrow: arrow,
+        pos: new THREE.Vector3(wp.x, wp.y, wp.z),
+        cleared: false,
+        label: wp.label
+      });
+    });
+
+    // -------------------------------------------------------------
+    // 7. Quadcopter 3D Model Construction
+    // -------------------------------------------------------------
+    const drone = new THREE.Group();
+    drone.position.set(0, 0.75, 0);
+
+    // Fuselage / Central Pod
+    const bodyGeo = new THREE.BoxGeometry(1.0, 0.28, 1.4);
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x1f242c,
+      roughness: 0.4,
+      metalness: 0.8
+    });
+    const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+    bodyMesh.castShadow = true;
+    drone.add(bodyMesh);
+
+    // Aerodynamic Top Canopy Dome
+    const canopyGeo = new THREE.SphereGeometry(0.55, 16, 12);
+    canopyGeo.scale(0.8, 0.35, 1.3);
+    const canopyMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0d14,
+      roughness: 0.2,
+      metalness: 0.9
+    });
+    const canopyMesh = new THREE.Mesh(canopyGeo, canopyMat);
+    canopyMesh.position.y = 0.15;
+    drone.add(canopyMesh);
+
+    // FRONT LED INDICATOR (Vivid Glowing Green Nose Light)
+    const ledFrontGeo = new THREE.SphereGeometry(0.12, 12, 12);
+    const ledFrontMat = new THREE.MeshBasicMaterial({ color: 0x00ff44 });
+    const ledFront = new THREE.Mesh(ledFrontGeo, ledFrontMat);
+    ledFront.position.set(0, 0.05, -0.72);
+    drone.add(ledFront);
+
+    const ledFrontLight = new THREE.PointLight(0x00ff44, 2.5, 8);
+    ledFrontLight.position.set(0, 0.05, -0.8);
+    drone.add(ledFrontLight);
+
+    // REAR LED (Pulsing Red Beacon)
+    const ledRearGeo = new THREE.SphereGeometry(0.1, 12, 12);
+    const ledRearMat = new THREE.MeshBasicMaterial({ color: 0xff2244 });
+    const ledRear = new THREE.Mesh(ledRearGeo, ledRearMat);
+    ledRear.position.set(0, 0.05, 0.72);
+    drone.add(ledRear);
+
+    // 4 Diagonal Motor Arms (X-Configuration)
+    const armMat = new THREE.MeshStandardMaterial({
+      color: 0x111317,
+      roughness: 0.5,
+      metalness: 0.85
+    });
+
+    const motorMounts = [];
+    const propellers = [];
+    const armLength = 1.35;
+    const armAngles = [
+      { angle: Math.PI * 0.25, dir: 1,  name: 'FL' }, // Front-Left
+      { angle: Math.PI * 0.75, dir: -1, name: 'RL' }, // Rear-Left
+      { angle: Math.PI * 1.25, dir: 1,  name: 'RR' }, // Rear-Right
+      { angle: Math.PI * 1.75, dir: -1, name: 'FR' }  // Front-Right
+    ];
+
+    armAngles.forEach(cfg => {
+      const armGroup = new THREE.Group();
+      armGroup.rotation.y = cfg.angle;
+
+      // Arm Bar
+      const barGeo = new THREE.CylinderGeometry(0.04, 0.05, armLength, 8);
+      const barMesh = new THREE.Mesh(barGeo, armMat);
+      barMesh.rotation.z = Math.PI / 2;
+      barMesh.position.x = armLength / 2;
+      barMesh.castShadow = true;
+      armGroup.add(barMesh);
+
+      // Motor Hub
+      const motorGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.22, 16);
+      const motorMat = new THREE.MeshStandardMaterial({ color: 0x3a404d, metalness: 0.9, roughness: 0.2 });
+      const motorMesh = new THREE.Mesh(motorGeo, motorMat);
+      motorMesh.position.set(armLength, 0.06, 0);
+      motorMesh.castShadow = true;
+      armGroup.add(motorMesh);
+
+      // Propeller (Dual blade)
+      const propGroup = new THREE.Group();
+      propGroup.position.set(armLength, 0.18, 0);
+
+      const propBladeGeo = new THREE.BoxGeometry(1.2, 0.015, 0.09);
+      const propBladeMat = new THREE.MeshStandardMaterial({
+        color: 0xe0e6ed,
+        roughness: 0.3,
+        metalness: 0.4
+      });
+      const propBlade = new THREE.Mesh(propBladeGeo, propBladeMat);
+      propBlade.castShadow = true;
+      propGroup.add(propBlade);
+
+      // Center spinner cone
+      const spinnerGeo = new THREE.ConeGeometry(0.06, 0.1, 12);
+      const spinnerMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff });
+      const spinner = new THREE.Mesh(spinnerGeo, spinnerMat);
+      spinner.position.y = 0.05;
+      propGroup.add(spinner);
+
+      armGroup.add(propGroup);
+      drone.add(armGroup);
+
+      propellers.push({
+        group: propGroup,
+        dir: cfg.dir
+      });
+      motorMounts.push({
+        armGroup: armGroup,
+        pos: new THREE.Vector3()
+      });
+    });
+
+    // Landing skids
+    const skidMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+    [-0.45, 0.45].forEach(x => {
+      const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 6), skidMat);
+      leg1.position.set(x, -0.15, -0.4);
+      drone.add(leg1);
+
+      const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 6), skidMat);
+      leg2.position.set(x, -0.15, 0.4);
+      drone.add(leg2);
+
+      const runner = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.2, 6), skidMat);
+      runner.rotation.x = Math.PI / 2;
+      runner.position.set(x, -0.3, 0);
+      drone.add(runner);
+    });
+
+    // Left & Right Wingtip Anchor Points for Aerodynamic Trails
+    const leftWingtipMarker = new THREE.Object3D();
+    leftWingtipMarker.position.set(-1.45, 0.12, 0);
+    drone.add(leftWingtipMarker);
+
+    const rightWingtipMarker = new THREE.Object3D();
+    rightWingtipMarker.position.set(1.45, 0.12, 0);
+    drone.add(rightWingtipMarker);
+
+    scene.add(drone);
+
+    // -------------------------------------------------------------
+    // 8. Dynamic Wingtip Trails (High-Contrast White & Black Ribbons)
+    // -------------------------------------------------------------
+    class DynamicRibbonTrail {
+      constructor(colorHex, isWhiteSide = true, maxPoints = 120) {
+        this.maxPoints = maxPoints;
+        this.history = []; // Array of { pos: Vector3, up: Vector3 }
+        this.width = 0.38; // Ribbon width in meters
+
+        // Build triangle strip ribbon geometry: (maxPoints * 2) vertices
+        this.geometry = new THREE.BufferGeometry();
+        const vertexCount = maxPoints * 2;
+        const positions = new Float32Array(vertexCount * 3);
+        const colors = new Float32Array(vertexCount * 3);
+        const indices = [];
+
+        for (let i = 0; i < maxPoints - 1; i++) {
+          const v0 = i * 2;
+          const v1 = i * 2 + 1;
+          const v2 = (i + 1) * 2;
+          const v3 = (i + 1) * 2 + 1;
+          indices.push(v0, v1, v2);
+          indices.push(v1, v3, v2);
+        }
+
+        this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        this.geometry.setIndex(indices);
+
+        this.material = new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          side: THREE.DoubleSide,
+          transparent: true,
+          depthWrite: false
+        });
+
+        this.mesh = new THREE.Mesh(this.geometry, this.material);
+        this.mesh.frustumCulled = false;
+        scene.add(this.mesh);
+
+        this.baseColor = new THREE.Color(colorHex);
+        this.isWhiteSide = isWhiteSide;
+      }
+
+      addPoint(worldPos, worldUp) {
+        // Prepend newest point
+        this.history.unshift({
+          pos: worldPos.clone(),
+          up: worldUp.clone().normalize()
+        });
+        if (this.history.length > this.maxPoints) {
+          this.history.pop();
+        }
+        this.updateMesh();
+      }
+
+      updateMesh() {
+        const positions = this.geometry.attributes.position.array;
+        const colors = this.geometry.attributes.color.array;
+        const count = this.history.length;
+
+        for (let i = 0; i < this.maxPoints; i++) {
+          const pt = i < count ? this.history[i] : (count > 0 ? this.history[count - 1] : { pos: new THREE.Vector3(), up: new THREE.Vector3(0, 1, 0) });
+          // Width tapers smoothly from 0.38m at head to 0.05m at tail
+          const progress = i / this.maxPoints; // 0.0 (head) to 1.0 (tail)
+          const currentWidth = (1.0 - progress * 0.85) * this.width;
+
+          // Vertex pair offset along up vector
+          const p1x = pt.pos.x + pt.up.x * (currentWidth * 0.5);
+          const p1y = pt.pos.y + pt.up.y * (currentWidth * 0.5);
+          const p1z = pt.pos.z + pt.up.z * (currentWidth * 0.5);
+
+          const p2x = pt.pos.x - pt.up.x * (currentWidth * 0.5);
+          const p2y = pt.pos.y - pt.up.y * (currentWidth * 0.5);
+          const p2z = pt.pos.z - pt.up.z * (currentWidth * 0.5);
+
+          const idx1 = (i * 2) * 3;
+          const idx2 = (i * 2 + 1) * 3;
+
+          positions[idx1] = p1x;
+          positions[idx1 + 1] = p1y;
+          positions[idx1 + 2] = p1z;
+
+          positions[idx2] = p2x;
+          positions[idx2 + 1] = p2y;
+          positions[idx2 + 2] = p2z;
+
+          // Smooth exponential fade out
+          const alphaFade = Math.pow(1.0 - progress, 1.4);
+          let r = this.baseColor.r * alphaFade;
+          let g = this.baseColor.g * alphaFade;
+          let b = this.baseColor.b * alphaFade;
+
+          // If black trail, maintain high-contrast dark aerodynamic look
+          if (!this.isWhiteSide) {
+            r = 0.05 * alphaFade;
+            g = 0.05 * alphaFade;
+            b = 0.06 * alphaFade;
+          }
+
+          colors[idx1] = r;
+          colors[idx1 + 1] = g;
+          colors[idx1 + 2] = b;
+
+          colors[idx2] = r;
+          colors[idx2 + 1] = g;
+          colors[idx2 + 2] = b;
+        }
+
+        this.geometry.attributes.position.needsUpdate = true;
+        this.geometry.attributes.color.needsUpdate = true;
+      }
+    }
+
+    // Left Wingtip = Crisp Pure White Ribbon Trail
+    const leftTrail = new DynamicRibbonTrail(0xffffff, true, 120);
+    // Right Wingtip = Deep Jet-Black Aerodynamic Ribbon Trail
+    const rightTrail = new DynamicRibbonTrail(0x050505, false, 120);
+
+    // -------------------------------------------------------------
+    // 9. Realistic Physics Simulation Model
+    // -------------------------------------------------------------
+    const physics = {
+      pos: new THREE.Vector3(0, 0.75, 0),
+      vel: new THREE.Vector3(0, 0, 0),
+      yaw: 0.0,
+      pitch: 0.0,
+      roll: 0.0,
+      gravity: 9.8,
+      hoverThrust: 9.8,
+      climbPower: 14.0,
+      horizontalThrustFactor: 18.0,
+      yawSpeed: 2.5,
+      linearDrag: 1.4,
+      verticalDrag: 1.2,
+      minY: 0.75,
+      tiltSmoothness: 8.0
+    };
+
+    // -------------------------------------------------------------
+    // 10. AI Auto-Pilot Controller
+    // -------------------------------------------------------------
+    function updateAIAutoPilot(dt) {
+      if (!controls.autopilot) return;
+
+      const targetRing = rings[currentRingIndex];
+      const targetPos = targetRing.pos;
+
+      // Vector to target
+      const dx = targetPos.x - physics.pos.x;
+      const dy = targetPos.y - physics.pos.y;
+      const dz = targetPos.z - physics.pos.z;
+      const dist2D = Math.sqrt(dx * dx + dz * dz);
+
+      // Target heading
+      const desiredYaw = Math.atan2(-dx, -dz);
+      let yawDiff = desiredYaw - physics.yaw;
+      // Normalize to [-PI, PI]
+      while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+      while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+
+      // AI Yaw input (proportional)
+      controls.yaw = Math.max(-1.0, Math.min(1.0, yawDiff * 2.2));
+
+      // AI Altitude / Throttle control (PID-like)
+      const altError = dy;
+      controls.throttle = Math.max(-1.0, Math.min(1.0, altError * 0.28 - physics.vel.y * 0.22));
+
+      // AI Pitch / Forward flight
+      // Align heading first if facing the wrong way
+      if (Math.abs(yawDiff) < 0.8) {
+        const speedTarget = Math.min(1.0, dist2D / 12.0);
+        controls.pitch = THREE.MathUtils.lerp(controls.pitch, speedTarget * 0.75, dt * 4.0);
+      } else {
+        controls.pitch = THREE.MathUtils.lerp(controls.pitch, 0.15, dt * 4.0);
+      }
+
+      // AI Roll: auto-bank into sharp turns
+      controls.roll = -controls.yaw * 0.35;
+    }
+
+    // -------------------------------------------------------------
+    // 11. AI Flight Coach Dynamic Event System
+    // -------------------------------------------------------------
+    let lastCoachEventTime = 0;
+    let coachCooldown = 0;
+    const coachMessageEl = document.getElementById('coach-message');
+    const coachStatusPill = document.getElementById('coach-status-pill');
+
+    function triggerCoachAdvice(text, level = "normal") {
+      const now = performance.now();
+      // Allow overriding if urgent warning or ring cleared
+      if (level !== "urgent" && level !== "success" && now - lastCoachEventTime < 3500) {
+        return;
+      }
+      lastCoachEventTime = now;
+
+      coachMessageEl.style.opacity = '0';
+      setTimeout(() => {
+        coachMessageEl.innerText = text;
+        coachMessageEl.style.opacity = '1';
+
+        if (level === "urgent") {
+          coachStatusPill.innerText = "WARNING";
+          coachStatusPill.style.color = "var(--danger)";
+          coachStatusPill.style.background = "rgba(255, 51, 102, 0.2)";
+          sounds.playAlert();
+        } else if (level === "success") {
+          coachStatusPill.innerText = "EXCELLENT";
+          coachStatusPill.style.color = "var(--success)";
+          coachStatusPill.style.background = "rgba(0, 255, 136, 0.2)";
+        } else if (level === "ai") {
+          coachStatusPill.innerText = "AUTO-PILOT";
+          coachStatusPill.style.color = "var(--primary)";
+          coachStatusPill.style.background = "rgba(0, 240, 255, 0.2)";
+        } else {
+          coachStatusPill.innerText = "MONITORING";
+          coachStatusPill.style.color = "var(--primary)";
+          coachStatusPill.style.background = "rgba(0, 240, 255, 0.15)";
+        }
+      }, 150);
+    }
+
+    function checkFlightCoachRules(speedKmh, alt) {
+      // 1. High speed sharp turn detection
+      if (speedKmh > 38 && Math.abs(controls.yaw) > 0.65) {
+        triggerCoachAdvice("Caution: High momentum! Reduce forward pitch before executing sharp yaw turns to prevent drift.", "urgent");
+      }
+      // 2. High descent rate near ground
+      else if (alt < 4.5 && alt > 0.85 && physics.vel.y < -4.8) {
+        triggerCoachAdvice("Warning: High descent sink rate! Add vertical throttle to cushion touchdown.", "urgent");
+      }
+      // 3. Close to checkpoint guidance
+      else {
+        const activeRing = rings[currentRingIndex];
+        const distToRing = physics.pos.distanceTo(activeRing.pos);
+        if (distToRing < 18 && distToRing > 6) {
+          triggerCoachAdvice(`Approaching Gate #${currentRingIndex + 1}. Steady your roll and align crosshair through center.`, "normal");
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 12. Camera Controller Modes
+    // -------------------------------------------------------------
+    let cameraMode = 0; // 0: 3rd-Person Follow, 1: Cockpit FPV, 2: Orbit / Wide
+    const camButton = document.getElementById('btn-toggle-camera');
+    camButton.addEventListener('click', cycleCameraMode);
+
+    function cycleCameraMode() {
+      cameraMode = (cameraMode + 1) % 3;
+      const modes = ["📷 View: Follow", "📷 View: FPV", "📷 View: Wide"];
+      camButton.innerText = modes[cameraMode];
+    }
+
+    // Sound toggle
+    const audioBtn = document.getElementById('btn-audio-toggle');
+    audioBtn.addEventListener('click', () => {
+      sounds.enabled = !sounds.enabled;
+      audioBtn.innerText = sounds.enabled ? "🔊 Sound: ON" : "🔇 Sound: OFF";
+    });
+
+    function resetDrone() {
+      physics.pos.set(0, 0.75, 0);
+      physics.vel.set(0, 0, 0);
+      physics.yaw = 0;
+      physics.pitch = 0;
+      physics.roll = 0;
+      controls.throttle = 0;
+      controls.yaw = 0;
+      controls.pitch = 0;
+      controls.roll = 0;
+      triggerCoachAdvice("Drone reset to Helipad launch coordinates. Flight telemetry recalibrated.", "normal");
+    }
+
+    // -------------------------------------------------------------
+    // 13. Main Simulation Physics & Render Loop
+    // -------------------------------------------------------------
+    let lastTime = performance.now();
+    const tempVec = new THREE.Vector3();
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    const leftTipPos = new THREE.Vector3();
+    const rightTipPos = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // Merge Keyboard input if mobile not actively overriding
+      let thrInput = controls.throttle;
+      let yawInput = controls.yaw;
+      let pitInput = controls.pitch;
+      let rolInput = controls.roll;
+
+      if (keys['w']) thrInput = 1.0;
+      if (keys['s']) thrInput = -1.0;
+      if (keys['a']) yawInput = -1.0;
+      if (keys['d']) yawInput = 1.0;
+      if (keys['arrowup']) pitInput = 1.0;
+      if (keys['arrowdown']) pitInput = -1.0;
+      if (keys['arrowleft']) rolInput = -1.0;
+      if (keys['arrowright']) rolInput = 1.0;
+
+      // Run AI Autopilot if active
+      if (controls.autopilot) {
+        updateAIAutoPilot(dt);
+        thrInput = controls.throttle;
+        yawInput = controls.yaw;
+        pitInput = controls.pitch;
+        rolInput = controls.roll;
+      }
+
+      // Physics: Yaw rotation
+      physics.yaw -= yawInput * physics.yawSpeed * dt;
+
+      // Aerodynamic Forward & Lateral Vectors
+      const forwardX = -Math.sin(physics.yaw);
+      const forwardZ = -Math.cos(physics.yaw);
+      const rightX = -forwardZ;
+      const rightZ = forwardX;
+
+      // Thrust calculation
+      const isOnGround = physics.pos.y <= physics.minY + 0.05;
+      let verticalThrust = 0;
+
+      if (isOnGround) {
+        // Must apply positive throttle to take off
+        if (thrInput > 0.05) {
+          verticalThrust = physics.hoverThrust + thrInput * physics.climbPower;
+        } else {
+          verticalThrust = physics.hoverThrust * 0.5; // Idle on ground
+        }
+      } else {
+        // Airborne: neutral throttle maintains hover
+        verticalThrust = physics.hoverThrust + thrInput * physics.climbPower;
+      }
+
+      // Acceleration
+      const totalThrust = Math.max(0, verticalThrust);
+      const totalAccelY = totalThrust - physics.gravity;
+
+      // Horizontal acceleration directed by pitch & roll
+      const accelX = (forwardX * pitInput + rightX * rolInput) * physics.horizontalThrustFactor;
+      const accelZ = (forwardZ * pitInput + rightZ * rolInput) * physics.horizontalThrustFactor;
+
+      // Integrate velocity with drag
+      physics.vel.y += totalAccelY * dt;
+      physics.vel.x += accelX * dt;
+      physics.vel.z += accelZ * dt;
+
+      physics.vel.x *= Math.max(0, 1.0 - physics.linearDrag * dt);
+      physics.vel.z *= Math.max(0, 1.0 - physics.linearDrag * dt);
+      physics.vel.y *= Math.max(0, 1.0 - physics.verticalDrag * dt);
+
+      // Integrate position
+      physics.pos.x += physics.vel.x * dt;
+      physics.pos.y += physics.vel.y * dt;
+      physics.pos.z += physics.vel.z * dt;
+
+      // Ground Collision Constraint
+      if (physics.pos.y <= physics.minY) {
+        // Check for hard landing
+        if (physics.vel.y < -6.5) {
+          document.body.classList.add('shake-impact');
+          setTimeout(() => document.body.classList.remove('shake-impact'), 400);
+          sounds.playImpact();
+          triggerCoachAdvice("Hard landing impact! Check landing skid integrity.", "urgent");
+        }
+        physics.pos.y = physics.minY;
+        physics.vel.y = 0;
+        // High ground friction
+        physics.vel.x *= 0.8;
+        physics.vel.z *= 0.8;
+      }
+
+      // Visual Body Tilting (Realistic Spring-Damper Pitch & Roll)
+      const targetPitch = pitInput * 0.35 + (physics.vel.x * forwardX + physics.vel.z * forwardZ) * 0.02;
+      const targetRoll = -rolInput * 0.35 - (physics.vel.x * rightX + physics.vel.z * rightZ) * 0.02;
+
+      physics.pitch = THREE.MathUtils.lerp(physics.pitch, targetPitch, dt * physics.tiltSmoothness);
+      physics.roll = THREE.MathUtils.lerp(physics.roll, targetRoll, dt * physics.tiltSmoothness);
+
+      // Apply transformation to drone 3D group
+      drone.position.copy(physics.pos);
+      drone.rotation.order = 'YXZ';
+      drone.rotation.y = physics.yaw;
+      drone.rotation.x = -physics.pitch;
+      drone.rotation.z = -physics.roll;
+
+      // Propeller spin animation
+      const flightSpeed = Math.sqrt(physics.vel.x * physics.vel.x + physics.vel.z * physics.vel.z);
+      const rpm = (isOnGround && thrInput <= 0 ? 12 : 45 + thrInput * 30 + flightSpeed * 1.5);
+      propellers.forEach(p => {
+        p.group.rotation.y += p.dir * rpm * dt;
+      });
+
+      // -------------------------------------------------------------
+      // Dynamic Wingtip Trails Update
+      // -------------------------------------------------------------
+      leftWingtipMarker.getWorldPosition(leftTipPos);
+      rightWingtipMarker.getWorldPosition(rightTipPos);
+
+      // Drone up vector in world space
+      const droneWorldUp = new THREE.Vector3(0, 1, 0).applyQuaternion(drone.quaternion);
+
+      // Add trail point if airborne or moving
+      if (physics.pos.y > physics.minY + 0.1 || flightSpeed > 0.5) {
+        leftTrail.addPoint(leftTipPos, droneWorldUp);
+        rightTrail.addPoint(rightTipPos, droneWorldUp);
+      } else {
+        // When stationary on ground, age out trail
+        if (leftTrail.history.length > 0) leftTrail.history.pop();
+        if (rightTrail.history.length > 0) rightTrail.history.pop();
+        leftTrail.updateMesh();
+        rightTrail.updateMesh();
+      }
+
+      // -------------------------------------------------------------
+      // Golden Checkpoint Rings Animation & Hit Detection
+      // -------------------------------------------------------------
+      rings.forEach((r, idx) => {
+        // Floating gentle bob & spin
+        r.arrow.rotation.y += dt * 2.0;
+        r.arrow.position.y = 4.8 + Math.sin(now * 0.003 + idx) * 0.3;
+        r.torus.rotation.z += dt * (idx === currentRingIndex ? 0.8 : 0.2);
+
+        // Highlight active ring
+        if (idx === currentRingIndex) {
+          r.torus.material = ringMatActive;
+          r.arrow.visible = true;
+          r.field.material.opacity = 0.25 + Math.sin(now * 0.006) * 0.1;
+        } else if (r.cleared) {
+          r.torus.material = ringMatCleared;
+          r.arrow.visible = false;
+          r.field.material.opacity = 0.08;
+        } else {
+          r.torus.material = ringMatInactive;
+          r.arrow.visible = false;
+          r.field.material.opacity = 0.12;
+        }
+      });
+
+      // Hit detection for active ring
+      const activeRing = rings[currentRingIndex];
+      const distToActive = physics.pos.distanceTo(activeRing.pos);
+      if (distToActive < 4.2) {
+        // Ring cleared!
+        activeRing.cleared = true;
+        sounds.playChime();
+        score += 500;
+        ringsClearedCount++;
+        document.getElementById('val-score').innerText = `${score.toLocaleString()} PTS`;
+        document.getElementById('val-rings').innerText = `${ringsClearedCount} / ${rings.length}`;
+
+        triggerCoachAdvice(`Outstanding! Gate #${currentRingIndex + 1} cleared with precision. +500 PTS awarded!`, "success");
+
+        currentRingIndex = (currentRingIndex + 1) % rings.length;
+
+        if (ringsClearedCount === rings.length) {
+          triggerCoachAdvice("🏆 MISSION COMPLETE! All 6 aerobatic course checkpoints successfully cleared!", "success");
+        }
+      }
+
+      // -------------------------------------------------------------
+      // Camera Follow Dynamics
+      // -------------------------------------------------------------
+      if (cameraMode === 0) {
+        // 3rd-Person Follow Camera
+        const camDistance = 7.5;
+        const camHeight = 2.8;
+        const targetCamX = physics.pos.x - forwardX * camDistance;
+        const targetCamZ = physics.pos.z - forwardZ * camDistance;
+        const targetCamY = Math.max(physics.pos.y + camHeight, 1.2);
+
+        camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetCamX, dt * 6.0);
+        camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetCamY, dt * 6.0);
+        camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetCamZ, dt * 6.0);
+
+        const lookTarget = tempVec.set(
+          physics.pos.x + forwardX * 3.0,
+          physics.pos.y + 0.8,
+          physics.pos.z + forwardZ * 3.0
+        );
+        camera.lookAt(lookTarget);
+      } else if (cameraMode === 1) {
+        // FPV Cockpit
+        camera.position.set(physics.pos.x + forwardX * 0.4, physics.pos.y + 0.25, physics.pos.z + forwardZ * 0.4);
+        const lookTarget = tempVec.set(
+          physics.pos.x + forwardX * 20.0,
+          physics.pos.y + 0.25 - physics.pitch * 5.0,
+          physics.pos.z + forwardZ * 20.0
+        );
+        camera.lookAt(lookTarget);
+      } else {
+        // Wide Orbit View
+        camera.position.set(0, 50, 40);
+        camera.lookAt(physics.pos);
+      }
+
+      // -------------------------------------------------------------
+      // Telemetry HUD Update
+      // -------------------------------------------------------------
+      const speedKmh = Math.round(flightSpeed * 3.6);
+      const altDisplay = Math.max(0, physics.pos.y - 0.75).toFixed(1);
+      const headingDeg = Math.round(((physics.yaw * 180 / Math.PI) % 360 + 360) % 360);
+      const pitchDeg = Math.round(physics.pitch * 180 / Math.PI);
+      const rollDeg = Math.round(physics.roll * 180 / Math.PI);
+      const throttlePercent = Math.round((thrInput * 50) + 50);
+
+      document.getElementById('val-alt').innerHTML = `${altDisplay} <span>m</span>`;
+      document.getElementById('val-spd').innerHTML = `${speedKmh} <span>km/h</span>`;
+      document.getElementById('val-hdg').innerHTML = `${headingDeg.toString().padStart(3, '0')} <span>°</span>`;
+      document.getElementById('val-thr').innerHTML = `${throttlePercent} <span>%</span>`;
+      document.getElementById('val-pitch').innerHTML = `${pitchDeg} <span>°</span>`;
+      document.getElementById('val-roll').innerHTML = `${rollDeg} <span>°</span>`;
+
+      // Check coach advice rules periodically
+      checkFlightCoachRules(speedKmh, physics.pos.y);
+
+      // Render Scene
+      renderer.render(scene, camera);
+    }
+
+    // Window Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start Simulation
+    animate();
+  </script>
+</body>
+</html>
